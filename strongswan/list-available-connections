@@ -1,0 +1,5 @@
+#!/bin/bash
+# set cwd to where this script is
+cd "$(dirname "$0")"
+
+cat ipsec.conf | grep "conn " | grep -v "%default" 

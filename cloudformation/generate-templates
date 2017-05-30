@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# list of all troposphere script names
+TROPOSPHERE_SCRIPTS="
+	vpc
+"
+
+# set cwd to where this script is
+cd "$(dirname "$0")"
+
+for f in $TROPOSPHERE_SCRIPTS
+do
+	echo "Generating template $f.json"
+
+	python $f.py > $f.json
+done
+echo "done."
