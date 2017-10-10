@@ -43,33 +43,17 @@ If changes are made to any of the Troposphere scripts, run ```generate-templates
 The list of Troposhpere scripts to process is inside the ```generate-templates``` shell script. 
 
 
-#### Applying modifications:
-Apply the template using this command:
-
-```python
-python cfn.py -c vpc.json -t -p VPCBaseNet=10.999 --region=ap-southeast-1 DEVEAST
-```
-
-Run all or any of the *run-vpc-xxx* scripts. If changes have been made, they will be applied automatically. Make sure the base net is globally unique (i.e. not just within a particular region).
-
-Tips:
-
- - Don't forget to run ```generate-templates``` if you make change to any Troposhpere script. Remember to commit both the script and the template to Git once you have applied the changes.
- - Try out your modifications on your local dev or test tier first, before applying it to all the other tiers.
- - Monitor the results in the [AWS CloudFormation Console](https://console.aws.amazon.com/cloudformation/)
- - You can delete a stack using the AWS Console or this command line: `aws cloudformation delete-stack --stack-name mytest`
- - Check out [aws cloudformation](http://docs.aws.amazon.com/cli/latest/reference/cloudformation/index.html) for more info on the command line tool.
 
 
 
 
 ### Step 1: Create an SSH key for EC2 instances:
-![](img/1449085590_warning.png) Run this command from the root of your **directive-tiers** repo:
 
 ```bash
-awsrun ec2 create-key-pair --key-name ${SSHKEYNAME} --query 'KeyMaterial' > ssh-keys/${SSHKEYNAME}.pem
+awsrun ec2 create-key-pair --key-name ${SSHKEYNAME} --query 'KeyMaterial' > ${SSHKEYNAME}.pem
 ```
 
+Copy the key into your *~/.ssh* folder and *chmod* it to 400.
 
 ### Step 2: Set up and run the AWS CloudFormation Tier command:
 ![](img/1449085590_warning.png) Run this command from the root of your **drift-aws** repo:
@@ -92,7 +76,9 @@ chmod +x ./cloudformation/run-vpc-${TIERNAMELOWER}
 
 
 ### Step 3: Add Tier to StrongSwan VPN configuration:
-![](img/1449085590_warning.png) Run this command from the root of your **drift-aws** repo:
+
+If you haven't done it already, copy the **ipsec.conf** file found in the strongswan folder to `/etc/ipsec.conf` on Linux or `/sumthingsumthing` on OSX.
+
 
 ```bash
 echo 'conn '`echo ${TIERNAMELOWER}`'
@@ -100,16 +86,13 @@ echo 'conn '`echo ${TIERNAMELOWER}`'
 	rightsubnet='`echo ${VPCBASENET}`'.0.0/16
 ' >> strongswan/ipsec.conf
 ```
-This script adds the tier to the [strongswan/ipsec.conf](strongswan/ipsec.conf) file. Remember to submit it to Git!
-
-Run `sync-ipsec-to-local-osx` from the strongswan folder to enable the new VPN config on your local Mac.
+This script adds the tier to the [strongswan/ipsec.conf](strongswan/ipsec.conf) file.
 
 
 ## Provisioning Drift Tier Servers
 Each Drift tier runs a few off the shelf servers or services:
 
- - NAT/VPN server.
- - RabbitMQ server.
+ - VPN server.
  - S3 buckets.
  - Redis server.
  - Postgres server.
@@ -119,7 +102,7 @@ At the moment these services are set up semi-manually.
 **NOTE! In the Bash code, set the proper values in to the environment variables before executing the rest of the commands. The ones that require changes are grouped together in the examples below.**
 
 
-### NAT/VPN Server
+### VPN Server
 
 #### ERRATA - Use aws NAT service!
  - In AWS web console, go to **VPC** dashboard.
