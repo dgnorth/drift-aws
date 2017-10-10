@@ -121,6 +121,15 @@ At the moment these services are set up semi-manually.
 
 ### NAT/VPN Server
 
+#### ERRATA - Use aws NAT service!
+ - In AWS web console, go to **VPC** dashboard.
+ - Select **NAT Gateways** and click on **Create NAT Gateway**. Select the public subnet of the tier, assign/create elastic IP for it and click on **Create a NAT Gateway**.
+ - Select **Route Tables**.
+ - Select the tiers *private* route table, click on **Routes** tab and click **Edit**.
+ - For destination `0.0.0.0/0` change the target to the newly created nat instance. (The AWS nat resource id's are prefixed with *nat-*).
+ - Add a new entry for destination `10.3.0.0/16` and assign the VPN box as target. (The VPN box instance name is *TIERNAME-nat* so it's easy to spot).
+
+
 
 ##### Launch the EC2 instance
 The latest Ubuntu-Trusty 14.04 AMI is used as base image.
