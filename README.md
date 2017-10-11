@@ -202,7 +202,7 @@ Remember to add DNS entry to the instance. The address is in `${REDISADDR}` envi
 ##### Create DB instance
 ```bash
 SGID=`aws ec2 describe-security-groups --region ${REGION} --output text --filters Name=tag:Name,Values=${TIERNAME}-private-sg | grep SECURITYGROUPS | cut -f 3`
-DBSUBNETGROUP=`aws rds describe-db-subnet-groups --region ${REGION} --output text | grep ${TIERNAME}-db-subnetgroup | cut -f 3`
+DBSUBNETGROUP=`aws rds describe-db-subnet-groups --region ${REGION} --output text | grep ${TIERNAME}-db-subnetgroup | cut -f 4`
 aws rds create-db-instance --region ${REGION} --output text --db-name postgres --db-instance-identifier ${TIERNAME}-postgresql --allocated-storage 20 --db-instance-class db.t2.small --engine postgres --master-username postgres --master-user-password postgres --vpc-security-group-ids ${SGID} --db-subnet-group-name ${DBSUBNETGROUP} --no-multi-az --no-publicly-accessibl --tags Key=tier,Value=${TIERNAME} --storage-type gp2
 
 awsrun rds wait db-instance-available --db-instance-identifier ${TIERNAME}-postgresql
