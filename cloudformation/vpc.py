@@ -200,7 +200,7 @@ t.add_resource(ec2.Route(
 
 # Set up general security groups for the VPC and some specific ones for the
 # following servers:
-# - NAT/VPN server.
+# - VPN server.
 # - RabbitMQ server.
 # - Redis server.
 # - Postgres server.
@@ -237,11 +237,11 @@ private_sg = t.add_resource(ec2.SecurityGroup(
     ],
 ))
 
-# NAT/VPN Security Group
+# VPN Security Group
 private_sg = t.add_resource(ec2.SecurityGroup(
-    "NATSecurityGroup",
+    "VPNSecurityGroup",
     VpcId=Ref("VPC"),
-    Tags=TierTags("nat-sg"),
+    Tags=TierTags("vpn-sg"),
     GroupDescription="Allow IpSec traffic from any source.",
     SecurityGroupIngress=[
         ec2.SecurityGroupRule(
@@ -256,7 +256,7 @@ private_sg = t.add_resource(ec2.SecurityGroup(
             ToPort="4500",
             CidrIp="0.0.0.0/0",
         ),
-        # This is so EC2's on private subnets can NAT trough.
+        # This is so EC2's on private subnets can VPN trough.
         ec2.SecurityGroupRule(
             IpProtocol="-1",
             FromPort="-1",

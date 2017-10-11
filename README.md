@@ -92,6 +92,7 @@ This script adds the tier to the [strongswan/ipsec.conf](strongswan/ipsec.conf) 
 ## Provisioning Drift Tier Servers
 Each Drift tier runs a few off the shelf servers or services:
 
+ - NAT service.
  - VPN server.
  - S3 buckets.
  - Redis server.
@@ -101,17 +102,16 @@ At the moment these services are set up semi-manually.
 
 **NOTE! In the Bash code, set the proper values in to the environment variables before executing the rest of the commands. The ones that require changes are grouped together in the examples below.**
 
+### NAT Service
 
-### VPN Server
-
-#### ERRATA - Use aws NAT service!
  - In AWS web console, go to **VPC** dashboard.
  - Select **NAT Gateways** and click on **Create NAT Gateway**. Select the public subnet of the tier, assign/create elastic IP for it and click on **Create a NAT Gateway**.
  - Select **Route Tables**.
  - Select the tiers *private* route table, click on **Routes** tab and click **Edit**.
  - For destination `0.0.0.0/0` change the target to the newly created nat instance. (The AWS nat resource id's are prefixed with *nat-*).
- - Add a new entry for destination `10.3.0.0/16` and assign the VPN box as target. (The VPN box instance name is *TIERNAME-nat* so it's easy to spot).
 
+  
+### VPN Server
 
 
 ##### Launch the EC2 instance
@@ -122,122 +122,64 @@ The launch script is loosely based on [how to set up strongSwan on AWS](https://
 ![](img/1449085590_warning.png) Run this command from the root of your **drift-aws** repo:
 
 ```bash
-SGNAME=${TIERNAME}-nat-sg
+SGNAME=${TIERNAME}-vpn-sg
 SGNAMEPRIV=${TIERNAME}-private-sg
 VPCID=`aws ec2 describe-vpcs --region ${REGION} --output text --filters Name=tag:Name,Values=${TIERNAME}-vpc | grep "VPCS" | cut -f 7`
 SGID=`aws ec2 describe-security-groups --region ${REGION} --output text --filters Name=tag:Name,Values=${SGNAME} | grep SECURITYGROUPS | cut -f 3`
 SGIDPRIV=`aws ec2 describe-security-groups --region ${REGION} --output text --filters Name=tag:Name,Values=${SGNAMEPRIV} | grep SECURITYGROUPS | cut -f 3`
-AMI=`aws ec2 describe-images --region ${REGION} --output text --output text --owners 099720109477 --filters Name=name,Values="ubuntu*trusty*14.04*" --query 'Images[*].[CreationDate,ImageId,Name]'  | grep ubuntu/images/hvm/ubuntu-trusty-14.04 | sort | tail -n 1 | cut -f 2`
-SUBNETID=`aws ec2 describe-subnets --region ${REGION} --output text --filters Name=tag:Name,Values=${TIERNAME}-public-subnet-1 | grep SUBNETS | cut -f 8`
+AMI=`aws ec2 describe-images --region ${REGION} --output text --output text --owners 099720109477 --filters Name=name,Values="ubuntu*xenial*16.04*" --query 'Images[*].[CreationDate,ImageId,Name]'  | grep ubuntu/images/hvm-ssd/ubuntu-xenial-16.04 | sort | tail -n 1 | cut -f 2`
+SUBNETID=`aws ec2 describe-subnets --region ${REGION} --output text --filters Name=tag:Name,Values=${TIERNAME}-public-subnet-1 | grep SUBNETS | cut -f 9`
 
 LAUNCHSCRIPT=`cat strongswan/configure-strongswan.sh`
    
-EC2ID=`aws ec2 run-instances --region ${REGION} --output text --image-id ${AMI} --count 1 --instance-type t2.small --key-name ${SSHKEYNAME} --security-group-ids ${SGID} ${SGIDPRIV} --subnet-id ${SUBNETID} --monitoring Enabled=true --disable-api-termination --iam-instance-profile Name=nat --user-data ${LAUNCHSCRIPT} | grep INSTANCES | cut -f 8`
+EC2ID=`aws ec2 run-instances --region ${REGION} --output text --image-id ${AMI} --count 1 --instance-type t2.small --key-name ${SSHKEYNAME} --security-group-ids ${SGID} ${SGIDPRIV} --subnet-id ${SUBNETID} --monitoring Enabled=true --disable-api-termination --iam-instance-profile Name=vpn --user-data '${LAUNCHSCRIPT}' | grep INSTANCES | cut -f 8`
 
-echo NAT Box instance: ${EC2ID}
+echo VPN Box instance: ${EC2ID}
 awsrun ec2 wait instance-running --instance-ids ${EC2ID}
 ```
 
 Once the instance is available, continue here to tag the instance, turn off source-dest check, allocate an elastic IP address and add a route from within the VPC out to VPN clients:
 
 ```bash
-aws ec2 create-tags --region ${REGION} --output text --resources ${EC2ID} --tags Key=Name,Value=${TIERNAME}-nat  Key=tier,Value=${TIERNAME} Key=service-name,Value=nat
-
-aws ec2 modify-instance-attribute --region ${REGION} --output text --instance-id ${EC2ID} --source-dest-check "{\"Value\": false}"
+aws ec2 create-tags --region ${REGION} --output text --resources ${EC2ID} --tags Key=Name,Value=${TIERNAME}-vpn  Key=tier,Value=${TIERNAME} Key=service-name,Value=vpn
 
 EIPALLOCID=`aws ec2 allocate-address --region ${REGION} --output text --domain ${VPCID} | cut -f 1`
 aws ec2 associate-address --region ${REGION} --output text --instance-id ${EC2ID} --allocation-id ${EIPALLOCID}
 
 RTPUB=`aws ec2 describe-route-tables --region ${REGION} --output text --filters Name=tag:Name,Values=${TIERNAME}-rtbl-internet | grep ROUTETABLES | cut -f 2`
 aws ec2 create-route --region ${REGION} --output text --route-table-id ${RTPUB} --destination-cidr-block 10.3.0.0/16 --instance-id ${EC2ID}
-RTPRIV=`aws ec2 describe-route-tables --region ${REGION} --output text --filters Name=tag:Name,Values=${TIERNAME}-rtbl-private | grep ROUTETABLES | cut -f 2`
-aws ec2 create-route --region ${REGION} --output text --route-table-id ${RTPRIV} --destination-cidr-block 0.0.0.0/0 --instance-id ${EC2ID}
+
 VPNIP=`aws ec2 describe-addresses --region ${REGION} --output text --filters Name=allocation-id,Values=${EIPALLOCID} --query 'Addresses[*].[PublicIp]'`
 
 VPNDNS=`awsrun ec2 describe-instances --instance-ids ${EC2ID} --query 'Reservations[0].Instances[0].[PublicDnsName]'`
 
-echo NAT Box IP address: ${VPNIP}
-echo NAT Box DNS Name: ${VPNDNS}
+echo VPN Box IP address: ${VPNIP}
+echo VPN Box DNS Name: ${VPNDNS}
+echo "Add this as A record to your root domain:"
+echo vpn.${TIERNAMELOWER}.${ROOTDOMAIN} = ${VPNIP}
 
 ```
 
-Remember to add DNS entry to the instance. The address is in `${VPNIP}` environment variable.
-
 *Note: If external SSH access is needed, the security group must be modified to allow SSH traffic from the internet (preferably to our own public IP address). Here are the commands to connect:*
+
+See if you can ssh onto the vpn:
+
 
 ```bash
 ssh ubuntu@${VPNIP} -i ~/.ssh/${SSHKEYNAME}.pem
 ```
 
+#### Errata:
+The ipsec.conf file is not proper. Use this one with the appropriate amendments:
+
+```
+# /etc/ipsec.conf - strongSwan IPsec configuration fileconfig setupconn %default     ikelifetime=60m     keylife=20m     rekeymargin=3m     keyingtries=1     keyexchange=ikev2     authby=secret     auto=addconn PresharedKey     left=10.50.21.148     leftsubnet=10.50.0.0/16     leftid=theglobalsecretid     right=%any     rightsourceip=10.3.50.0/24
+```
 
 ### Strongswan Config
- * Make a DNS entry which points to the NAT/VPN instance (See Adding DNS section below).
+ * Make a DNS entry which points to the VPN instance (See Adding DNS section below).
  * Add the new tier to */strongswan/ipsec.conf*
 
-
-### RabbitMQ Server
-The RabbitMQ server is a single EC2 instance running Ubuntu and RabbitMQ.
-
-![](img/1449085590_warning.png) Run this command from the root of your **drift-aws/rabbitmq** repo and folder:
-
-##### These keypairs are used globally
-```bash
-TIERNAME=roxxor-dev
-SSHKEYNAME=dgn-dev-ec2
-REGION=eu-west-1
-```
-
-##### Use Packer to provision the RabbitMQ AMI
-```bash
-AMI=`aws ec2 describe-images --region ${REGION} --output text --owners 099720109477 --filters Name=name,Values="ubuntu*trusty*14.04*" --query 'Images[*].[CreationDate,ImageId,Name]'  | grep ubuntu/images/hvm/ubuntu-trusty-14.04 | sort | tail -n 1 | cut -f 2`
-echo "Using AMI ${AMI}"
-packer build -var source_ami=${AMI} -var rabbit_pwd=rabbit -var admin_pwd=rabbit -var tier=${TIERNAME} -var aws_region=${REGION} rabbitmq.json
-```
-
-##### Launch the RabbitMQ instance
-```bash
-SGNAME=${TIERNAME}-rabbitmq-sg
-SGNAMEPRIV=${TIERNAME}-private-sg
-SGID=`aws ec2 describe-security-groups --region ${REGION} --output text --filters Name=tag:Name,Values=${SGNAME} | grep SECURITYGROUPS | cut -f 3`
-SGIDPRIV=`aws ec2 describe-security-groups --region ${REGION} --output text --filters Name=tag:Name,Values=${SGNAMEPRIV} | grep SECURITYGROUPS | cut -f 3`
-AMINAME=rabbitmq
-OWNERID=092475124519
-AMI=`aws ec2 describe-images --region ${REGION} --output text --owners ${OWNERID} --filters Name=name,Values="${AMINAME}*" | grep IMAGES | sort | tail -n 1 | cut -f 5`
-SUBNETID=`aws ec2 describe-subnets --region ${REGION} --output text --filters Name=tag:Name,Values=${TIERNAME}-private-subnet-1 | grep SUBNETS | cut -f 8`
-
-LAUNCHSCRIPT='
-#!/bin/bash
-sudo rabbitmqctl delete_user guest
-sudo rabbitmqctl add_user rabbit rabbit
-sudo rabbitmqctl set_permissions -p / rabbit ".*" ".*" ".*"
-sudo rabbitmqctl add_user rabbit_admin rabbit
-sudo rabbitmqctl set_permissions -p / rabbit_admin ".*" ".*" ".*"
-sudo rabbitmqctl set_user_tags rabbit_admin administrator
-'
-
-EC2ID=`aws ec2 run-instances --region ${REGION} --output text --image-id ${AMI} --count 1 --instance-type t2.small --key-name ${SSHKEYNAME} --security-group-ids ${SGID} ${SGIDPRIV} --subnet-id ${SUBNETID} --monitoring Enabled=true --disable-api-termination --iam-instance-profile Name=rabbitmq --user-data ${LAUNCHSCRIPT} | grep INSTANCES | cut -f 8`
-echo "Instance launched: ${EC2ID}"
-aws ec2 create-tags --region ${REGION} --output text --resources ${EC2ID} --tags Key=Name,Value=${TIERNAME}-rabbitmq  Key=tier,Value=${TIERNAME} Key=service-name,Value=rabbitmq
-RABBITIP=`aws ec2 --region ${REGION} describe-instances --instance-ids ${EC2ID} --query 'Reservations[0].Instances[0].PrivateIpAddress' --output text`
-
-echo RabbitMQ IP address: ${RABBITIP}
-echo Please add a DNS A record for this: rabbitmq.${TIERNAMELOWER}.${ROOTDOMAIN}
-```
-
-Remember to add DNS entry to the instance as described by the last echos from the script above.
-
-**ERRATA**: The *rabbitmqctl* commands are not working, neither in the baking nor in the launch script. The only current work-around is to **ssh** into the instance and run the commands there manually:
-
-```bash
-ssh ubuntu@${RABBITIP} -i ~/.ssh/${SSHKEYNAME}.pem
-sudo rabbitmqctl delete_user guest
-sudo rabbitmqctl add_user rabbit rabbit
-sudo rabbitmqctl set_permissions -p / rabbit ".*" ".*" ".*"
-sudo rabbitmqctl add_user rabbit_admin rabbit
-sudo rabbitmqctl set_permissions -p / rabbit_admin ".*" ".*" ".*"
-sudo rabbitmqctl set_user_tags rabbit_admin administrator
-
-```
 
 ### Redis Server
 The Redis server is a managed instance.
@@ -278,7 +220,6 @@ Create a DNS entry for each of the servers. Example:
 | ---------- | ---- | ------- |-------------- |
 |redis.devnorth.dg-api.com | CNAME | ${REDISADDR} | devnorth-redis.xnves0.0001.euw1.cache.amazonaws |
 |postgres.devnorth.dg-api.com | CNAME | ${POSTGRESQLADDR} | devnorth-postgresql.c40zji49p9dj.eu-west-1.rds.amazonaws |
-|rabbitmq.devnorth.dg-api.com | A | ${RABBITIP} | 10.50.1.76 |
 |vpn.devnorth.dg-api.com| A | ${VPNIP} |52.18.20.30|
 
 
