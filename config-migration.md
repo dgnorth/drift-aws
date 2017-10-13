@@ -22,10 +22,15 @@ dconf organization add directivegames dg
 dconf product add dg-superkaiju
 dconf tenant add dg-superkaiju-deveast dg-superkaiju
 
+# call drift-admin deployable register. it's a work in progress...
+drift-admin --tier DEVEAST --config dgnorth deployable register
 
 driftconfig addtenant dgnorth -n dg-superkaiju-deveast -t DEVEAST -o directivegames -p dg-superkaiju -d drift-base
 driftconfig push dgnorth
 ```
+
+
+
 
 The config is missing the auto-filled entries for aws. This needs to be added manually until the provision logic is fully rigged.
 

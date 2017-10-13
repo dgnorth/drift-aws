@@ -113,6 +113,7 @@ At the moment these services are set up semi-manually.
   
 ### VPN Server
 
+In IAM, create a role called vpn and assign no policy to it.
 
 ##### Launch the EC2 instance
 The latest Ubuntu-Trusty 14.04 AMI is used as base image.
@@ -141,6 +142,7 @@ awsrun ec2 wait instance-running --instance-ids ${EC2ID}
 Once the instance is available, continue here to tag the instance, turn off source-dest check, allocate an elastic IP address and add a route from within the VPC out to VPN clients:
 
 ```bash
+aws ec2 modify-instance-attribute --region ${REGION} --output text --instance-id ${EC2ID} --source-dest-check "{\"Value\": false}"
 aws ec2 create-tags --region ${REGION} --output text --resources ${EC2ID} --tags Key=Name,Value=${TIERNAME}-vpn  Key=tier,Value=${TIERNAME} Key=service-name,Value=vpn
 
 EIPALLOCID=`aws ec2 allocate-address --region ${REGION} --output text --domain ${VPCID} | cut -f 1`
@@ -211,6 +213,14 @@ POSTGRESQLADDR=`aws rds --region ${REGION} describe-db-instances --db-instance-i
 ```
 
 Remember to add DNS entry to the instance. The address is in `${POSTGRESQLADDR}` environment variable.
+
+The user **zzp_user** must be created manually.
+
+ - Connect to the DB machine with pgAdmin4 or psql (`psql -h {POSTGRESQLADDR} -U postgres`).
+ - Create a user called **zzp_user** with same password (`create user zzp_user with password 'zzp_user';`).
+ - Asssing "can login" privilege, and add role **rds_superuser** to the user (`grant rds_superuser to zzp_user;`)
+
+
 
 ## Adding servers to DNS
 Create a DNS entry for each of the servers. Example:
