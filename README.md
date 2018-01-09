@@ -3,6 +3,32 @@ Provisioning and management tools for AWS cloud.
 
 This document assumes you have the [AWS Command Line Interface Tool](http://docs.aws.amazon.com/cli/latest/reference/index.html#cli-aws) installed. Use these [install instructions](http://docs.aws.amazon.com/cli/latest/userguide/installing.html) to get the very latest version of the tool.
 
+It is highly recommended that you use an IAM user account type. Here's how to set one up:
+
+- In AWS Console, go to IAM service and create a new IAM user for your personal use.
+- Give it **PowerUserAccess** role.
+- Generate an access key pair.
+
+Add a profile for your IAM user in your local aws config file. Example:
+
+##### ~/.aws/credentials
+```ini
+[beijing]
+aws_access_key_id = AKIA123123123123123
+aws_secret_access_key = 9b90fed63b94/05374a6b
+```
+
+##### ~/.aws/config
+```ini
+[profile beijing]
+region = cn-north-1
+output = text
+```
+
+Now the aws tool can be run using any of the profiles defined in the config files:
+
+`aws --profile beijing	do-something`
+  
 
 ## Configuration setup and VPC provisioning:
 
@@ -11,14 +37,16 @@ Run this, with the appropriate adjustments:
 ```bash
 # Set the proper values here
 TIERNAME=DEVSKULL
+AWSPROFILE=beijing
 REGION=eu-west-1
 ROOTDOMAIN=dg-api.com
 VPCBASENET=10.99
 
 # Don't change this
-alias awsrun='aws --region ${REGION} --output text $1'
+alias awsrun='aws --profile ${AWSPROFILE} --output text $1'
 TIERNAMELOWER=`echo ${TIERNAME} | tr '[:upper:]' '[:lower:]'`
 SSHKEYNAME=${TIERNAMELOWER}-key
+export AWS_PROFILE=${AWSPROFILE}
 ```
 
 # Configuring the Tier Template
@@ -49,11 +77,13 @@ The list of Troposhpere scripts to process is inside the ```generate-templates``
 
 ### Step 1: Create an SSH key for EC2 instances:
 
+Create a key pair in ~/.ssh and chmod it to 400:
+
 ```bash
-awsrun ec2 create-key-pair --key-name ${SSHKEYNAME} --query 'KeyMaterial' > ${SSHKEYNAME}.pem
+awsrun ec2 create-key-pair --key-name ${SSHKEYNAME} --query 'KeyMaterial' > ~/.ssh/${SSHKEYNAME}.pem
+chmod 400 ~/.ssh/${SSHKEYNAME}.pem     
 ```
 
-Copy the key into your *~/.ssh* folder and *chmod* it to 400.
 
 ### Step 2: Set up and run the AWS CloudFormation Tier command:
 ![](img/1449085590_warning.png) Run this command from the root of your **drift-aws** repo:
@@ -77,22 +107,22 @@ chmod +x ./cloudformation/run-vpc-${TIERNAMELOWER}
 
 ### Step 3: Add Tier to StrongSwan VPN configuration:
 
-If you haven't done it already, copy the **ipsec.conf** file found in the strongswan folder to `/etc/ipsec.conf` on Linux or `/sumthingsumthing` on OSX.
+If you haven't done it already, copy the **ipsec.conf** file found in the strongswan folder to `/etc/ipsec.conf` on Linux or `/usr/local/etc/ipsec.conf` on OSX.
 
+Add connection to ipsec.conf on your macbook:
 
 ```bash
-echo 'conn '`echo ${TIERNAMELOWER}`'
+echo '\nconn '`echo ${TIERNAMELOWER}`'
 	right=vpn.'`echo ${TIERNAMELOWER}.${ROOTDOMAIN}`'
 	rightsubnet='`echo ${VPCBASENET}`'.0.0/16
-' >> strongswan/ipsec.conf
+' >> /usr/local/etc/ipsec.conf
 ```
-This script adds the tier to the [strongswan/ipsec.conf](strongswan/ipsec.conf) file.
+
 
 
 ## Provisioning Drift Tier Servers
 Each Drift tier runs a few off the shelf servers or services:
 
- - NAT service.
  - VPN server.
  - S3 buckets.
  - Redis server.
