@@ -125,20 +125,10 @@ Each Drift tier runs a few off the shelf servers or services:
 
  - VPN server.
  - S3 buckets.
- - Redis server.
- - Postgres server.
  
 At the moment these services are set up semi-manually.
 
 **NOTE! In the Bash code, set the proper values in to the environment variables before executing the rest of the commands. The ones that require changes are grouped together in the examples below.**
-
-### NAT Service
-
- - In AWS web console, go to **VPC** dashboard.
- - Select **NAT Gateways** and click on **Create NAT Gateway**. Select the public subnet of the tier, assign/create elastic IP for it and click on **Create a NAT Gateway**.
- - Select **Route Tables**.
- - Select the tiers *private* route table, click on **Routes** tab and click **Edit**.
- - For destination `0.0.0.0/0` change the target to the newly created nat instance. (The AWS nat resource id's are prefixed with *nat-*).
 
   
 ### VPN Server
