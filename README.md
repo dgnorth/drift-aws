@@ -143,13 +143,19 @@ The launch script is loosely based on [how to set up strongSwan on AWS](https://
 ![](img/1449085590_warning.png) Run this command from the root of your **drift-aws** repo:
 
 ```bash
+# Pick either one!
+OWNERID=099720109477  # All regions except China, https://www.canonical.com/
+OWNERID=837727238323  # China, some Ubuntu user. Who knows. Hopefully Canonical.
+```
+
+```bash
 SGNAME=${TIERNAME}-vpn-sg
 SGNAMEPRIV=${TIERNAME}-private-sg
 VPCID=`aws ec2 describe-vpcs --region ${REGION} --output text --filters Name=tag:Name,Values=${TIERNAME}-vpc | grep "VPCS" | cut -f 7`
 SGID=`aws ec2 describe-security-groups --region ${REGION} --output text --filters Name=tag:Name,Values=${SGNAME} | grep SECURITYGROUPS | cut -f 3`
 SGIDPRIV=`aws ec2 describe-security-groups --region ${REGION} --output text --filters Name=tag:Name,Values=${SGNAMEPRIV} | grep SECURITYGROUPS | cut -f 3`
-AMI=`aws ec2 describe-images --region ${REGION} --output text --output text --owners 099720109477 --filters Name=name,Values="ubuntu*xenial*16.04*" --query 'Images[*].[CreationDate,ImageId,Name]'  | grep ubuntu/images/hvm-ssd/ubuntu-xenial-16.04 | sort | tail -n 1 | cut -f 2`
-SUBNETID=`aws ec2 describe-subnets --region ${REGION} --output text --filters Name=tag:Name,Values=${TIERNAME}-public-subnet-1 | grep SUBNETS | cut -f 9`
+AMI=`aws ec2 describe-images --region ${REGION} --output text --output text --owners ${OWNERID} --filters Name=name,Values="ubuntu*xenial*16.04*" --query 'Images[*].[CreationDate,ImageId,Name]'  | grep ubuntu/images/hvm-ssd/ubuntu-xenial-16.04 | sort | tail -n 1 | cut -f 2`
+SUBNETID=`aws ec2 describe-subnets --region ${REGION} --output text --filters Name=tag:Name,Values=${TIERNAME}-public-subnet-1 --query 'Subnets[0].[SubnetId]'`
 
 LAUNCHSCRIPT=`cat strongswan/configure-strongswan.sh`
    
@@ -238,7 +244,7 @@ The user **zzp_user** must be created manually.
 
  - Connect to the DB machine with pgAdmin4 or psql (`psql -h {POSTGRESQLADDR} -U postgres`).
  - Create a user called **zzp_user** with same password (`create user zzp_user with password 'zzp_user';`).
- - Asssing "can login" privilege, and add role **rds_superuser** to the user (`grant rds_superuser to zzp_user;`)
+ - Assign "can login" privilege, and add role **rds_superuser** to the user (`grant rds_superuser to zzp_user;`)
 
 
 
