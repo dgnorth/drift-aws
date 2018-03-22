@@ -1,0 +1,5 @@
+include driftvpn/*.jinja
+recursive-include scripts *
+recursive-include config *
+include Pipfile
+include Pipfile.lock

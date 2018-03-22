@@ -1,0 +1,365 @@
+# Nginx config generated from template:
+# Domain name: {{ conf.domain.domain_name }}
+# Origin:      {{ conf.domain.origin }}
+{% if nginx.user %}
+user {{ nginx.user }};
+{% else %}
+#user ubuntu;
+{% endif %}
+worker_processes auto;
+pid {{ plat.pid }};
+worker_rlimit_nofile {{ nginx.worker_rlimit_nofile if nginx.worker_rlimit_nofile else "30000" }};
+
+events {
+    worker_connections {{ nginx.worker_connections if nginx.worker_connections else "30000" }};
+    # multi_accept on;
+}
+
+http {
+    # Json is king. Making it the default return type for all http responses.
+    default_type application/json;
+
+    ##
+    # Basic Settings
+    ##
+
+    map_hash_max_size 32768;
+    map_hash_bucket_size 256;
+
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    # server_tokens off;
+
+    # server_names_hash_bucket_size 64;
+    # server_name_in_redirect off;
+
+    # A possible fix to a problem described here:
+    # https://stackoverflow.com/questions/34768527/uwsgi-ioerror-write-error
+    uwsgi_ignore_client_abort on;
+
+    include {{ plat.etc }}/nginx/mime.types;
+
+
+    ##
+    # Logging Settings
+    ##
+    # Use special log log_format
+    log_format jsonlog '{'
+        '"timestamp": "$msec",'
+        '"remote_addr": "$remote_addr",'
+        '"tier": "{{ conf.tier.tier_name }}",'
+        '"hostname": "$hostname",'
+        '"drift_api_key": "$http_drift_api_key",'
+        '"server_name": "$server_name",'
+        '"host": "$host",'
+        '"request": "$request",'
+        '"request_length": "$request_length",'
+        '"response_code": $status,'
+        '"response_size": $body_bytes_sent,'
+        '"bytes_sent": $bytes_sent,'
+        '"request_time": $request_time,'
+        '"upstream_response_time": "$upstream_response_time",'
+        '"upstream_addr": "$upstream_addr",'
+        '"referer": "$http_referer",'
+        '"user_agent": "$http_user_agent",'
+        '"gzip_ratio": "$gzip_ratio",'
+        '"cache_status": "$upstream_cache_status"'
+        '}';
+
+    access_log {{ plat.log }}/nginx/access.log jsonlog;
+    error_log {{ plat.log }}/nginx/error.log;
+
+
+    ##
+    # Gzip Settings
+    ##
+    gzip on;
+    gzip_comp_level 2;
+    gzip_types application/json;
+    gzip_min_length 20;  # Change this to 0 to force gzip
+
+
+    # Variables used in access control logic:
+
+    # $product_name         product name mapped from tenant name, or "_unknown_tenant_name"
+    # $drift_api_key        api key from client with without version, or "nokey"
+    # $host_domain          host domain name (hostname without the tenant name prefix)
+    # $tenant_name          tenant name (the prefix on the host name)
+    # $api_key_to_product   the product name for the given api key, or "_api key not found"
+    # $endpoint_requires_api_key     true | false depending if the endpoint or route requires it.
+
+    # Map tenant name to product:
+    map $http_host $product_name {
+        hostnames;  # Indicates that source values can be hostnames with a prefix or suffix mask
+        default "_unknown_tenant_name";
+        {% for tenant_name, product in tenants.items() %}
+        {{ tenant_name }}.*   {{ product.product_name }};
+        {%- endfor %}
+    }
+
+    # Get api key from client, rstrip optional version from it (indicated with
+    # a colon). If key is not found, "nokey" value is used.
+    map $http_drift_api_key $drift_api_key {
+        default "nokey";
+        ~^(?<api_key>.*?)($|:)   $api_key;
+    }
+    # Get host domain name (hostname without the tenant name prefix)
+    map $http_host $host_domain {
+         ~^(?<tenant>.*?)\.(?<domain>.*)$ $domain;
+    }
+
+    # Get tenant name (the prefix on the host name)
+    map $http_host $tenant_name {
+         ~^(?<tenant>.*?)\.(?<domain>.*)$ $tenant;
+    }
+
+    # Map api keys to products
+    map $drift_api_key $api_key_to_product {
+        default     "_api key not found";
+
+        # API keys from config:
+        {%- for key in conf.table_store.get_table('api-keys').find({'in_use': True}) %}
+        {% if 'product_name' in key %}
+        {{ key.api_key_name }}  {{ key.product_name }};
+        {% else %}
+        {{ key.api_key_name }}  _custom_api_key;
+        {% endif %}
+        {%- endfor %}
+    }
+
+
+    # See if endpoint requires api key
+    # Example of 'routes' info:
+    # routes = [
+    #     "tier_name": "TIERNAME",
+    #     "deployable_name": "deployable",
+    #     "api": "deployapi",
+    #     "requires_api_key": True,
+    #     "targets": [{"name": "x", "private_ip_address": "1.2.3.4", "tags": {...}}]
+    # ]
+    map $request_uri $endpoint_requires_api_key {
+        default "true";
+
+        # The following paths are always keyless:
+        ~*^/api-router(|/.*)$ "false";
+        /healthcheck "false";
+
+        # Routes from config:
+        {%- for name, route in routes.items() %}
+        {%- if not route.requires_api_key %}
+        ~*^/{{ route.api }}(|/.*)$ "false";
+        {%- endif %}
+        {%- endfor %}
+    }
+
+
+
+
+    # Set up connection and request rate limits
+    # "global" zone defines the total limits for the whole server.
+    # "per_client" defines the limit on a per client (or remote IP address).
+    # TODO: Figure out how these number make sense when there is more than one
+    # api-router running, and what happens when we scale out the services as well.
+    #limit_req_zone api_router zone=global:10m rate=250r/s;
+    #limit_req_zone $remote_addr zone=per_client:150m rate=50r/s;
+
+
+
+    ##
+    # Redirect http to https.
+    # This requires appropriate configuration on the ELB:
+    # Incoming unencrypted requests on port 80 are forwarded to 8081.
+    # Incoming TLS requests on port 443 are forwarded to 8080.
+    ##
+    server {
+        listen       8081;
+        server_name api_router_redirect;
+        location /
+        {
+            rewrite     ^   https://$host:8080$request_uri? permanent;
+        }
+    }
+
+
+    ##
+    # The API router server
+    ##
+    server {
+        listen       8080;
+        server_name  api_router;
+
+        real_ip_header X-Forwarded-For;
+        set_real_ip_from 10.0.0.0/8;
+
+        # Apply both 'global' limit and 'per_client' limit to the whole server.
+        #limit_req zone=global burst=250;
+        #limit_req zone=per_client burst=250;
+
+        root '{{ plat.root }}';
+
+        # return 201 '{"hello": "there"}';
+        # return 202 '{"hello": "there"}';
+        # return 203 '{"hello": "there"}';
+
+        location /favicon.ico {
+            log_not_found off;
+            access_log off;
+                error_log off;
+        }
+
+        location /api-router/request {
+            return 200 '{
+                "tier": "{{ conf.tier.tier_name }}",
+                "product_name": "$product_name",
+                "drift_api_key": "$drift_api_key",
+                "host_domain": "$host_domain",
+                "tenant_name": "$tenant_name",
+                "api_key_to_product": "$api_key_to_product",
+                "endpoint_requires_api_key": "$endpoint_requires_api_key",
+
+                "server_name": "$server_name",
+                "remote_addr": "$remote_addr",
+                "proxy_add_x_forwarded_for": "$proxy_add_x_forwarded_for",
+                "hostname": "$hostname",
+                "http_host": "$http_host",
+                "host": "$host",
+                "timestamp": "$msec",
+                "request": "$request",
+                "request_length": "$request_length",
+                "response_code": $status,
+                "response_size": $body_bytes_sent,
+                "bytes_sent": $bytes_sent,
+                "request_time": $request_time,
+                "upstream_response_time": "$upstream_response_time",
+                "upstream_addr": "$upstream_addr",
+                "referer": "$http_referer",
+                "user_agent": "$http_user_agent",
+                "gzip_ratio": "$gzip_ratio",
+                "cache_status": "$upstream_cache_status",
+                "bad_key_and_requires_key": "$bad_key_and_requires_key",
+
+                "request_headers":
+                {
+                    "Accept": "$http_accept",
+                    "Accept-Encoding": "$http_accept_encoding",
+                    "Accept-Language": "$http_accept_language",
+                    "Cache-Control": "$http_cache_control",
+                    "Connection": "$http_connection",
+                    "Host": "$http_host",
+                    "Upgrade-Insecure-Requests": "$http_insecure_requests",
+                    "User-Agent": "$http_user_agent",
+                    "Drift-Api-Key": "$http_drift_api_key"
+                }
+            }\n';
+
+        }
+
+        location /api-router {
+            index status.json;
+            #add_header 'Access-Control-Allow-Origin' '*';
+            if (-d $request_filename) {
+                rewrite [^/]$ $http_x_forwarded_proto://$http_host$uri/ permanent;
+            }
+        }
+
+        location /healthcheck {
+            # For ELB health check
+            return 200 '{"status_code": 200, "message": "Healthy"}\n';
+        }
+
+        error_page 404 /errors/404;
+        location = /errors/404 {
+            return 404 '{"status_code": 404, "message": "Not Found"}\n';
+        }
+
+        ##
+        # Dynamic locations:
+        ##
+        {% for name, route in routes.items() %}
+        # Deployable: '{{ route.deployable_name }}', active: {{ route.deployable.is_active }}
+        {%- if route.deployable.is_active == False %}
+        location /{{ route.api }} {
+            return 503 '{"status_code": 503, "message": "Service Unavailable. {{ route.deployable.reason_inactive }}"}';
+        }
+        {% elif route.healthy_targets %}
+        location /{{ route.api }} {
+            uwsgi_pass {{ name }}-servers;
+            uwsgi_param  QUERY_STRING       $query_string;
+            uwsgi_param  REQUEST_METHOD     $request_method;
+            uwsgi_param  CONTENT_TYPE       $content_type;
+            uwsgi_param  CONTENT_LENGTH     $content_length;
+
+            uwsgi_param  REQUEST_URI        $request_uri;
+            uwsgi_param  PATH_INFO          $document_uri;
+            uwsgi_param  DOCUMENT_ROOT      $document_root;
+            uwsgi_param  SERVER_PROTOCOL    $server_protocol;
+            uwsgi_param  HTTPS              $https if_not_empty;
+
+            uwsgi_param  REMOTE_ADDR        $remote_addr;
+            uwsgi_param  REMOTE_PORT        $remote_port;
+            uwsgi_param  SERVER_PORT        $server_port;
+            uwsgi_param  SERVER_NAME        $server_name;
+
+            uwsgi_param HTTP_X_SCRIPT_NAME  /{{ route.api }};
+        }
+        {% else %}
+        location /{{ route.api }} {
+            return 503 '{"status_code": 503, "message": "Service Unavailable. No targets registered."}';
+        }
+        {%- endif %}
+        {%- endfor %}
+
+        # API product key check
+        set $bad_key "false";
+        set $custom_api_key "false";
+
+        {% if nginx.api_key_passthrough %}
+        {%- for passthrough in nginx.api_key_passthrough %}
+        {{ "# Pass-through for legacy keys" if loop.first }}
+        if ($http_{{ passthrough.key_name.replace('-', '_') }} ~ {{ passthrough.key_value }} ) {
+            set $api_key_to_product {{ passthrough.product_name }};
+            set $custom_api_key "true";
+        }
+        {%- endfor %}
+        {%- else %}
+        # Note: No pass-through api keys defined.
+        {%- endif %}
+
+        if ($product_name != $api_key_to_product) {
+            set $bad_key "true";
+            set $reason "API key is for '${api_key_to_product}' but tenant is for product '${product_name}'.";
+        }
+
+        if ($api_key_to_product = "_api key not found") {
+            set $reason  "API key not found.";
+        }
+
+        if ($api_key_to_product = '_custom_api_key') {
+            set $bad_key "false";
+        }
+
+        set $bad_key_and_requires_key "${bad_key}:${endpoint_requires_api_key}";
+
+        # Bail out if key check fails
+        if ($bad_key_and_requires_key = "true:true") {
+            return 403
+            '{"status_code": 403, "message": "Forbidden",
+            "error": {"code": "api_key_error",
+            "description": "${reason}"}}\n';
+        }
+    }
+
+    {%- for name, route in routes.items() %}
+    {% if route.healthy_targets %}
+    upstream {{ name }}-servers {
+        {%- for target in route.healthy_targets %}
+        server {{ target.private_ip_address}}:{{ target.tags['api-port']}} {{ target.tags['api-param']}};  # {{ target.comment }}
+        {%- endfor %}
+    }
+    {%- endif %}
+    {%- endfor %}
+}
+
