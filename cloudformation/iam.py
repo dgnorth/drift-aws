@@ -26,11 +26,13 @@ aws cloudformation delete-stack --stack-name roxxor-dev
 info:
 aws cloudformation describe-stack-events --stack-name roxxor-dev
 
+
 '''
 
 
-from troposphere import Join, Output, Parameter, Ref, Tags, Template, GetAZs, Select, GetAtt, Export, Sub
-from troposphere import ec2, rds, elasticache, s3, elasticloadbalancing
+from troposphere import Join, Output, Parameter, Ref, Tags, Template, GetAZs, Select, GetAtt
+from troposphere import ec2, rds, elasticache, s3
+
 
 def _(*args):
     """Join elements together to make a string. I.e. wrap all items in 'args'
@@ -96,6 +98,11 @@ vpc_base_net = t.add_parameter(Parameter(
     Type="String",
 ))
 
+# The stack name in lower case (a requirement for S3 bucket names.)
+stack_name_lower = t.add_parameter(Parameter(
+    "StackNameLower",
+    Type="String",
+))
 
 # The VPC object
 vpc = t.add_resource(ec2.VPC(
@@ -105,6 +112,13 @@ vpc = t.add_resource(ec2.VPC(
     EnableDnsHostnames="true",
     Tags=TierTags("vpc", created_by=Ref("AWS::AccountId"))
 ))
+
+# TODO: Create a bucket for ELB api router logs. This below is just for reference.
+# s3_bucket = t.add_resource(s3.Bucket(
+#     "S3Bucket",
+#     BucketName=_("dg-", Ref(stack_name_lower)),
+#     Tags=TierTags("s3-bucket")
+# ))
 
 
 # Each VPC has two public subnet, two private subnets and two RDS subnets, covering
@@ -116,7 +130,6 @@ def add_subnet(tag_name, ip_part, route_table, az, realm):
     """Add a subnet named 'tag_name' with 'ip_part as the /24 domain and
     associated with 'route_table'. 'az' is the index into list of availability
     zones, i.e. "0", "1" or "2".
-    Export the subnet ID.
     """
     template_name = tag_name.title().replace('-', '')
     subnet = ec2.Subnet(
@@ -127,15 +140,6 @@ def add_subnet(tag_name, ip_part, route_table, az, realm):
         Tags=TierTags(tag_name, realm=realm)
     )
     subnet = t.add_resource(subnet)
-
-    t.add_output([
-        Output(
-            template_name,
-            Description="The ID of this subnet.",
-            Value=Ref(subnet),
-            Export=Export(_(Sub("${AWS::StackName}-"), tag_name)),
-        )
-    ])
 
     t.add_resource(ec2.SubnetRouteTableAssociation(
         "{}RouteTableAssociation".format(template_name),
@@ -236,7 +240,6 @@ private_sg = t.add_resource(ec2.SecurityGroup(
     ],
 ))
 
-
 # Allow incoming HTTPS traffic from any remote address.
 t.add_resource(ec2.SecurityGroup(
     "HTTPSSecurityGroup",
@@ -250,14 +253,171 @@ t.add_resource(ec2.SecurityGroup(
             ToPort="443",
             CidrIp="0.0.0.0/0",
         ),
+    ],
+))
+
+# VPN Security Group
+t.add_resource(ec2.SecurityGroup(
+    "VPNSecurityGroup",
+    VpcId=Ref("VPC"),
+    Tags=TierTags("vpn-sg"),
+    GroupDescription="Allow IpSec traffic from any source.",
+    SecurityGroupIngress=[
         ec2.SecurityGroupRule(
-            IpProtocol="tcp",
-            FromPort="80",
-            ToPort="80",
+            IpProtocol="udp",
+            FromPort="500",
+            ToPort="500",
             CidrIp="0.0.0.0/0",
+        ),
+        ec2.SecurityGroupRule(
+            IpProtocol="udp",
+            FromPort="4500",
+            ToPort="4500",
+            CidrIp="0.0.0.0/0",
+        ),
+        # This is so EC2's on private subnets can VPN trough.
+        ec2.SecurityGroupRule(
+            IpProtocol="-1",
+            FromPort="-1",
+            ToPort="-1",
+            CidrIp="10.0.0.0/8",
         ),
     ],
 ))
+
+# RabbitMQ Security Group
+if 0:
+    t.add_resource(ec2.SecurityGroup(
+        "RabbitMQSecurityGroup",
+        VpcId=Ref("VPC"),
+        Tags=TierTags("rabbitmq-sg"),
+        GroupDescription="Allow Rabbit protocol and HTTPS access from local addresses.",
+        SecurityGroupIngress=[
+            ec2.SecurityGroupRule(
+                IpProtocol="tcp",
+                FromPort="5672",
+                ToPort="5672",
+                CidrIp="10.0.0.0/8",
+            ),
+            ec2.SecurityGroupRule(
+                IpProtocol="tcp",
+                FromPort="15672",
+                ToPort="15672",
+                CidrIp="10.0.0.0/8",
+            ),
+        ],
+    ))
+
+
+if 0:
+    # Elasticache Subnet Group for Redis
+    elasticache_subnet_group = t.add_resource(elasticache.SubnetGroup(
+        "ElasticacheSubnetGroup",
+        Description=get_resource_name("elasticache-subnet-group"),
+        SubnetIds=[Ref(db_subnet_1), Ref(db_subnet_2)]
+    ))
+
+    # Redis Security Group
+    t.add_resource(ec2.SecurityGroup(
+        "RedisSecurityGroup",
+        VpcId=Ref("VPC"),
+        Tags=TierTags("redis-sg"),
+        GroupDescription="Allow Redis protocol access from local addresses. Very nice yes.",
+        SecurityGroupIngress=[
+            ec2.SecurityGroupRule(
+                IpProtocol="tcp",
+                FromPort="6379",
+                ToPort="6379",
+                CidrIp="10.0.0.0/8",
+            )
+        ],
+    ))
+
+
+# NU STYLE REDIS
+redis_sg = t.add_resource(ec2.SecurityGroup(
+    "RedisSecurityGroup",
+    VpcId=Ref("VPC"),
+    Tags=TierTags("redis-sg"),
+    GroupDescription="Allow Redis protocol access from local addresses. Very nice yes.",
+    SecurityGroupIngress=[
+        ec2.SecurityGroupRule(
+            IpProtocol="tcp",
+            FromPort="6379",
+            ToPort="6379",
+            CidrIp="10.0.0.0/8",
+        )
+    ],
+))
+
+redis_subnet_group = t.add_resource(elasticache.SubnetGroup(
+    "ElasticacheSubnetGroup",
+    Description=get_resource_name("elasticache-subnet-group"),
+    SubnetIds=[Ref(db_subnet_1), Ref(db_subnet_2)],
+))
+
+redis = t.add_resource(elasticache.CacheCluster(
+    'RedisCluster',
+    Engine='redis',
+    CacheNodeType='cache.t2.small',
+    NumCacheNodes='1',
+    CacheSubnetGroupName=Ref(redis_subnet_group),
+    VpcSecurityGroupIds=[Ref(redis_sg)],
+))
+
+
+# NU STYLE POSTGRES
+postgres_sg = t.add_resource(ec2.SecurityGroup(
+    "RDSSecurityGroup",
+    VpcId=Ref("VPC"),
+    Tags=TierTags("redis-sg"),
+    GroupDescription="Allow Redis protocol access from local addresses. Very nice yes.",
+    SecurityGroupIngress=[
+        ec2.SecurityGroupRule(
+            IpProtocol="tcp",
+            FromPort="5432",
+            ToPort="5433",
+            CidrIp="10.0.0.0/8",
+        )
+    ],
+))
+
+postgres = t.add_resource(rds.DBInstance(
+    "Postgres",
+    DBName='postgres',
+    AllocatedStorage=20,
+    DBInstanceClass='db.t2.small',
+    Engine="postgres",
+    MasterUsername='postgres',
+    MasterUserPassword='postgres',
+    DBSubnetGroupName=Ref(db_subnet_group),
+    VPCSecurityGroups=[Ref(postgres_sg)],
+    MultiAZ=False,
+))
+
+
+# RabbitMQ Security Group
+if 0:
+    t.add_resource(ec2.SecurityGroup(
+        "RabbitMQSecurityGroup2",
+        VpcId=Ref("VPC"),
+        Tags=TierTags("rabbitmq-sg"),
+        GroupDescription="Allow IpSec traffic from any source.",
+        SecurityGroupIngress=[
+            ec2.SecurityGroupRule(
+                IpProtocol="tpc",
+                FromPort="5672",
+                ToPort="5672",
+                CidrIp="10.0.0.0/8",
+            ),
+            ec2.SecurityGroupRule(
+                IpProtocol="tpc",
+                FromPort="15672",
+                ToPort="15672",
+                CidrIp="10.0.0.0/8",
+            ),
+        ],
+    ))
 
 
 t.add_output([
@@ -271,14 +431,7 @@ t.add_output([
         Description="VPCId of the newly created VPC.",
         Value=Ref("VPCBaseNet"),
     ),
-    Output(
-        "StackVPC",
-        Description="The ID of the VPC.",
-        Value=Ref(vpc),
-        Export=Export(Sub("${AWS::StackName}-VPCID")),
-    ),
 ])
 
 
 print t.to_json()
-#print t.to_yaml()

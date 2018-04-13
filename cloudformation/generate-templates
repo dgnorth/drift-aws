@@ -3,6 +3,8 @@
 # list of all troposphere script names
 TROPOSPHERE_SCRIPTS="
 	vpc
+    iam
+    asgtest
 "
 
 # set cwd to where this script is
