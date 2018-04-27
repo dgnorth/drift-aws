@@ -282,3 +282,58 @@ for c in export:
     with open('templates/drift-cfn-{}.json'.format(template.template_name), 'w') as f:
         f.write(template.t.to_json())
 
+'''
+
+an idea for a cli:
+
+- the template code is generated into templates folder every time a cli is executed. it's there for reference and such.
+
+- always create a change set which can be reviewed and/or executed. this is the only way to create or modify a stack.
+
+- pretty print the change set in the same manner as the aws web represents it in "change set details".
+
+- use parameters from driftconfig. allow override for testing purposes.
+
+- tag the stacks properly. use the tags to find/enumerate drift stacks.
+
+
+- to simplify cli, the only input is stack name and template name and if needed tier name
+  for driftconfig if it cannot be inferred from the stack name.
+
+
+
+  "UpdatePolicy": {
+
+
+    "AutoScalingRollingUpdate": {
+
+
+        "MaxBatchSize": Integer,
+
+
+        "MinInstancesInService": Integer,
+
+
+        "MinSuccessfulInstancesPercent": Integer
+
+
+        "PauseTime": String,
+
+
+        "SuspendProcesses": [ List of processes ],
+
+
+        "WaitOnResourceSignals": Boolean
+
+
+     }
+
+
+
+
+"UpdatePolicy" : {
+  "AutoScalingRollingUpdate" : {
+  }
+}
+
+'''
