@@ -28,6 +28,12 @@ aws s3 cp ${DATABASE}.pgdump s3://dg-scratchpad/pgdumps/${DATABASE}.pgdump
 rm ${DATABASE}.pgdump
 ```
 
+Note, you can create a temporary download link to the pgdump file on S3 like this:
+
+```bash
+python -c "import boto3; print boto3.client('s3').generate_presigned_url('get_object', Params = {'Bucket': 'dg-scratchpad', 'Key': 'pgdumps/${DATABASE}.pgdump'}, ExpiresIn=3600)"
+```
+
 ### The restore operation:
 The following commands must have access to the destination DMBS and should preferably be executed in the same VPC as the DMBS. **Make sure the destination DB does not exist!**
 
