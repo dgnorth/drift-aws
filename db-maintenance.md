@@ -39,6 +39,7 @@ The following commands must have access to the destination DMBS and should prefe
 
 ```bash
 # If the DB already exists, rename it or drop it!
+export PGHOST=postgres.${TO_TIER}.dg-api.com
 
 # Rename database
 psql -c "ALTER DATABASE \"${DATABASE}\" RENAME TO \"${DATABASE}.backup\""
