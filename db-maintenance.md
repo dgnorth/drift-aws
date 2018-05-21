@@ -60,3 +60,11 @@ pg_restore -Fc -C -d ${PGDATABASE} ${DATABASE}.pgdump
 rm ${DATABASE}.pgdump
 aws s3 rm s3://dg-scratchpad/pgdumps/${DATABASE}.pgdump
 ```
+
+##### Windows errata:
+If the restore operation fails on Windows because of invalid locale name, the work-around is to create the DB first and then run the restore:
+
+```batch
+psql -c "CREATE DATABASE \"thedbname\" WITH TEMPLATE=template0 ENCODING='UTF-8'"
+pg_restore -Fc -C -d postgres "thedumpfile.pgdump"
+```
