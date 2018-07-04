@@ -371,7 +371,40 @@
                 },
                 "SubnetId": {
                     "Ref": "PublicSubnet1"
-                }
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "StackGroup"
+                                    },
+                                    "-",
+                                    "nat-gateway"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "Key": "tier",
+                        "Value": {
+                            "Fn::ImportValue": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "StackGroup"
+                                        },
+                                        "-tier-name"
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                ]
             },
             "Type": "AWS::EC2::NatGateway"
         },

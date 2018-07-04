@@ -236,12 +236,14 @@ class VPC(DriftTemplate):
         self.nat_eip = self.t.add_resource(ec2.EIP(
             'NatEip',
             Domain="vpc",
+            #Tags=self.get_tags("nat-gw-eip")  # NOTE, tags not supported in Cloudformation just yet.
         ))
 
         self.nat = self.t.add_resource(ec2.NatGateway(
             'NatGateway',
             AllocationId=GetAtt(self.nat_eip, 'AllocationId'),
             SubnetId=Ref(self.public_subnet_1),
+            Tags=self.get_tags("nat-gateway")
         ))
 
         self.t.add_resource(ec2.Route(
