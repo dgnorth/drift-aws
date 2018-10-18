@@ -1,25 +1,15 @@
 [[source]]
-
 url = "https://pypi.python.org/simple"
 verify_ssl = true
 name = "pypi"
 
-
 [packages]
-
-# as 'extras' is buggy in pipenv, we explicitly include these:
-redis = "*"
-driftconfig = { git = 'https://github.com/dgnorth/drift-config.git', ref = 'develop', extras = ["s3-backend", "redis-backend"]}
-"jinja2" = "*"
+boto = "*"
 "boto3" = "*"
-requests = "*"
-
+tabulate = "*"
+driftconfig = { git = 'https://github.com/dgnorth/drift-config.git', ref = 'develop', extras = ["s3-backend", "redis-backend"]}
 
 [dev-packages]
 
-pytest = "*"
-
-
 [requires]
-
 python_version = "2.7"
