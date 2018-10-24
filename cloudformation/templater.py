@@ -269,6 +269,17 @@ class VPC(DriftTemplate):
             ],
         ))
 
+        # VPC Endpoint to API Gateway Service
+        self.endpoint = self.t.add_resource(ec2.VPCEndpoint(
+            "VPCEndpoint",
+            PrivateDnsEnabled=True,
+            SecurityGroupIds=[Ref(self.private_sg)],
+            ServiceName=_("com.amazonaws.", Ref("AWS::Region"), ".execute-api"),
+            SubnetIds=[Ref(self.private_subnet_1), Ref(self.private_subnet_2)],
+            VpcEndpointType="Interface",
+            VpcId=Ref("VPC"),
+        ))
+
         # Exported values
         self.export_value('id', "VPC ID.", Ref(self.vpc))
         self.export_value('vpc-base-net', "The first two IP numbers for the VPC CIDR.", Ref(self.vpc_base_net))
