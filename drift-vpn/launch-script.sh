@@ -32,7 +32,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get -y update
 
 
 echo "Step 1 — Installing StrongSwan"
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q strongswan strongswan-plugin-eap-mschapv2 moreutils iptables-persistent
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q iptables-persistent strongswan strongswan-starter strongswan-pki strongswan-plugin-eap-mschapv2 moreutils iptables-persistent
 
 echo "Step 2 — Fetch Certificate Authority"
 mkdir vpn-certs
@@ -115,7 +115,7 @@ echo "${SERVER_NAME_OR_IP} : RSA "/etc/ipsec.d/private/vpn-server-key.pem"
 " | sudo tee /etc/ipsec.secrets
 
 # Example entry: your_username %any% : EAP your_password
-sudo nano /etc/ipsec.secrets
+sudo aws s3 cp ${S3_KEYSTORE}/ipsec.secrets /etc/ipsec.secrets
 sudo ipsec reload
 
 # Use crontab to fetch shared ipsec.secrets
@@ -136,10 +136,10 @@ sudo aws ec2 modify-instance-attribute --instance-id ${EC2_INSTANCE_ID} --region
 
 sudo ufw disable
 
-iptables -P INPUT ACCEPT
-iptables -P FORWARD ACCEPT
-iptables -F
-iptables -Z
+sudo iptables -P INPUT ACCEPT
+sudo iptables -P FORWARD ACCEPT
+sudo iptables -F
+sudo iptables -Z
 
 sudo iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT

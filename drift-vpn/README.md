@@ -25,8 +25,18 @@ Each VPN client must have the CA's certificate installed on their system:
  - Windows: Run mmc.exe, add Certificates snap-in and import the certificate into "Trusted Root Certification Authorities/Certificates" folder.
  - iOS: Send yourself an email with the certificate attached, tap on the file and select Install.
 
-
 ## Set up VPN user account
+
+### Windows
+
+Run the following commands in a PowerShell:
+
+```PowerShell
+Add-VPNConnection -Name "CONNECTION-NAME" -ServerAddress "thevpn.somewhere.com" -SplitTunneling -PassThru
+Add-VpnConnectionRoute -ConnectionName "CONNECTION-NAME" -DestinationPrefix 10.999.0.0/16
+```
+
+## Set up VPN user account (DRAFT!)
 
 Run the following commands to manage VPN user accounts:
 
