@@ -165,7 +165,7 @@ def _list_stacks(tier, show_all):
     if not li:
         click.secho("Note! No stack found!. Use --show-all to see all stacks.")
     else:
-        click.secho(tabulate(li, headers=hd, tablefmt='fancy_grid'))
+        click.secho(tabulate(li, headers=hd, tablefmt='github'))
 
 
 @cli.command()
@@ -176,7 +176,7 @@ def update(ctx, stack_name):
 
     ia m temporoary
     """
-    print "stack name:", stack_name
+    print ("stack name: {}".format(stack_name))
 
 
 
