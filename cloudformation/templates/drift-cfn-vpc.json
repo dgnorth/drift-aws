@@ -1,0 +1,948 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "VPC resources.",
+    "Outputs": {
+        "DbSubnets": {
+            "Description": "DB subnets.",
+            "Export": {
+                "Name": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "StackGroup"
+                            },
+                            "-vpc-db-subnets"
+                        ]
+                    ]
+                }
+            },
+            "Value": {
+                "Fn::Join": [
+                    ",",
+                    [
+                        {
+                            "Ref": "DbSubnet1"
+                        },
+                        {
+                            "Ref": "DbSubnet2"
+                        }
+                    ]
+                ]
+            }
+        },
+        "Id": {
+            "Description": "VPC ID.",
+            "Export": {
+                "Name": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "StackGroup"
+                            },
+                            "-vpc-id"
+                        ]
+                    ]
+                }
+            },
+            "Value": {
+                "Ref": "VPC"
+            }
+        },
+        "PrivateSubnets": {
+            "Description": "Private subnets.",
+            "Export": {
+                "Name": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "StackGroup"
+                            },
+                            "-vpc-private-subnets"
+                        ]
+                    ]
+                }
+            },
+            "Value": {
+                "Fn::Join": [
+                    ",",
+                    [
+                        {
+                            "Ref": "PrivateSubnet1"
+                        },
+                        {
+                            "Ref": "PrivateSubnet2"
+                        }
+                    ]
+                ]
+            }
+        },
+        "PublicSubnets": {
+            "Description": "Public subnets.",
+            "Export": {
+                "Name": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "StackGroup"
+                            },
+                            "-vpc-public-subnets"
+                        ]
+                    ]
+                }
+            },
+            "Value": {
+                "Fn::Join": [
+                    ",",
+                    [
+                        {
+                            "Ref": "PublicSubnet1"
+                        },
+                        {
+                            "Ref": "PublicSubnet2"
+                        }
+                    ]
+                ]
+            }
+        },
+        "VpcBaseNet": {
+            "Description": "The first two IP numbers for the VPC CIDR.",
+            "Export": {
+                "Name": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "StackGroup"
+                            },
+                            "-vpc-vpc-base-net"
+                        ]
+                    ]
+                }
+            },
+            "Value": {
+                "Ref": "VPCBaseNet"
+            }
+        }
+    },
+    "Parameters": {
+        "StackGroup": {
+            "Description": "Name of the stack group this stack belongs to. It's typically the tier name.",
+            "Type": "String"
+        },
+        "VPCBaseNet": {
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})",
+            "ConstraintDescription": "must be a valid first two IP numbers of the form x.x",
+            "Description": "The first two IP numbers for the VPC CIDR.",
+            "MaxLength": "18",
+            "MinLength": "4",
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "DbSubnet1": {
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "0",
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "VPCBaseNet"
+                            },
+                            ".91.0/24"
+                        ]
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "StackGroup"
+                                    },
+                                    "-",
+                                    "db-subnet-1"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "Key": "realm",
+                        "Value": "db"
+                    },
+                    {
+                        "Key": "tier",
+                        "Value": {
+                            "Fn::ImportValue": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "StackGroup"
+                                        },
+                                        "-tier-name"
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "DbSubnet1RouteTableAssociation": {
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable"
+                },
+                "SubnetId": {
+                    "Ref": "DbSubnet1"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "DbSubnet2": {
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "1",
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "VPCBaseNet"
+                            },
+                            ".92.0/24"
+                        ]
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "StackGroup"
+                                    },
+                                    "-",
+                                    "db-subnet-2"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "Key": "realm",
+                        "Value": "db"
+                    },
+                    {
+                        "Key": "tier",
+                        "Value": {
+                            "Fn::ImportValue": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "StackGroup"
+                                        },
+                                        "-tier-name"
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "DbSubnet2RouteTableAssociation": {
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable"
+                },
+                "SubnetId": {
+                    "Ref": "DbSubnet2"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "IGWRoute": {
+            "Properties": {
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "InternetGateway"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicRouteTable"
+                }
+            },
+            "Type": "AWS::EC2::Route"
+        },
+        "InternetGateway": {
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "StackGroup"
+                                    },
+                                    "-",
+                                    "internet-gateway"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "Key": "tier",
+                        "Value": {
+                            "Fn::ImportValue": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "StackGroup"
+                                        },
+                                        "-tier-name"
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            "Type": "AWS::EC2::InternetGateway"
+        },
+        "InternetGatewayAttachment": {
+            "DependsOn": "InternetGateway",
+            "Properties": {
+                "InternetGatewayId": {
+                    "Ref": "InternetGateway"
+                },
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::VPCGatewayAttachment"
+        },
+        "NatEip": {
+            "Properties": {
+                "Domain": "vpc"
+            },
+            "Type": "AWS::EC2::EIP"
+        },
+        "NatGateway": {
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "NatEip",
+                        "AllocationId"
+                    ]
+                },
+                "SubnetId": {
+                    "Ref": "PublicSubnet1"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "StackGroup"
+                                    },
+                                    "-",
+                                    "nat-gateway"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "Key": "tier",
+                        "Value": {
+                            "Fn::ImportValue": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "StackGroup"
+                                        },
+                                        "-tier-name"
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            "Type": "AWS::EC2::NatGateway"
+        },
+        "NatRoute": {
+            "Properties": {
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": {
+                    "Ref": "NatGateway"
+                },
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable"
+                }
+            },
+            "Type": "AWS::EC2::Route"
+        },
+        "PrivateRouteTable": {
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "StackGroup"
+                                    },
+                                    "-",
+                                    "rtbl-private"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "Key": "tier",
+                        "Value": {
+                            "Fn::ImportValue": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "StackGroup"
+                                        },
+                                        "-tier-name"
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::RouteTable"
+        },
+        "PrivateSecurityGroup": {
+            "Properties": {
+                "GroupDescription": "Allow all traffic on 10.x.x.x",
+                "SecurityGroupIngress": [
+                    {
+                        "CidrIp": "10.0.0.0/8",
+                        "FromPort": "-1",
+                        "IpProtocol": "-1",
+                        "ToPort": "-1"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "StackGroup"
+                                    },
+                                    "-",
+                                    "private-sg"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "Key": "tier",
+                        "Value": {
+                            "Fn::ImportValue": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "StackGroup"
+                                        },
+                                        "-tier-name"
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::SecurityGroup"
+        },
+        "PrivateSubnet1": {
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "0",
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "VPCBaseNet"
+                            },
+                            ".1.0/24"
+                        ]
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "StackGroup"
+                                    },
+                                    "-",
+                                    "private-subnet-1"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "Key": "realm",
+                        "Value": "private"
+                    },
+                    {
+                        "Key": "tier",
+                        "Value": {
+                            "Fn::ImportValue": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "StackGroup"
+                                        },
+                                        "-tier-name"
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "PrivateSubnet1RouteTableAssociation": {
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable"
+                },
+                "SubnetId": {
+                    "Ref": "PrivateSubnet1"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "PrivateSubnet2": {
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "1",
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "VPCBaseNet"
+                            },
+                            ".2.0/24"
+                        ]
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "StackGroup"
+                                    },
+                                    "-",
+                                    "private-subnet-2"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "Key": "realm",
+                        "Value": "private"
+                    },
+                    {
+                        "Key": "tier",
+                        "Value": {
+                            "Fn::ImportValue": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "StackGroup"
+                                        },
+                                        "-tier-name"
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "PrivateSubnet2RouteTableAssociation": {
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable"
+                },
+                "SubnetId": {
+                    "Ref": "PrivateSubnet2"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "PublicRouteTable": {
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "StackGroup"
+                                    },
+                                    "-",
+                                    "rtbl-internet"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "Key": "tier",
+                        "Value": {
+                            "Fn::ImportValue": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "StackGroup"
+                                        },
+                                        "-tier-name"
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::RouteTable"
+        },
+        "PublicSubnet1": {
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "0",
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "VPCBaseNet"
+                            },
+                            ".21.0/24"
+                        ]
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "StackGroup"
+                                    },
+                                    "-",
+                                    "public-subnet-1"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "Key": "realm",
+                        "Value": "public"
+                    },
+                    {
+                        "Key": "tier",
+                        "Value": {
+                            "Fn::ImportValue": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "StackGroup"
+                                        },
+                                        "-tier-name"
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "PublicSubnet1RouteTableAssociation": {
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PublicRouteTable"
+                },
+                "SubnetId": {
+                    "Ref": "PublicSubnet1"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "PublicSubnet2": {
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "1",
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "VPCBaseNet"
+                            },
+                            ".22.0/24"
+                        ]
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "StackGroup"
+                                    },
+                                    "-",
+                                    "public-subnet-2"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "Key": "realm",
+                        "Value": "public"
+                    },
+                    {
+                        "Key": "tier",
+                        "Value": {
+                            "Fn::ImportValue": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "StackGroup"
+                                        },
+                                        "-tier-name"
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "PublicSubnet2RouteTableAssociation": {
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PublicRouteTable"
+                },
+                "SubnetId": {
+                    "Ref": "PublicSubnet2"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "VPC": {
+            "Properties": {
+                "CidrBlock": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "VPCBaseNet"
+                            },
+                            ".0.0/16"
+                        ]
+                    ]
+                },
+                "EnableDnsHostnames": "true",
+                "EnableDnsSupport": "true",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "StackGroup"
+                                    },
+                                    "-",
+                                    "vpc"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "Key": "created_by",
+                        "Value": {
+                            "Ref": "AWS::AccountId"
+                        }
+                    },
+                    {
+                        "Key": "tier",
+                        "Value": {
+                            "Fn::ImportValue": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "StackGroup"
+                                        },
+                                        "-tier-name"
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            "Type": "AWS::EC2::VPC"
+        },
+        "VPCEndpoint": {
+            "Properties": {
+                "PrivateDnsEnabled": "true",
+                "SecurityGroupIds": [
+                    {
+                        "Ref": "PrivateSecurityGroup"
+                    }
+                ],
+                "ServiceName": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            "com.amazonaws.",
+                            {
+                                "Ref": "AWS::Region"
+                            },
+                            ".execute-api"
+                        ]
+                    ]
+                },
+                "SubnetIds": [
+                    {
+                        "Ref": "PrivateSubnet1"
+                    },
+                    {
+                        "Ref": "PrivateSubnet2"
+                    }
+                ],
+                "VpcEndpointType": "Interface",
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::VPCEndpoint"
+        }
+    }
+}

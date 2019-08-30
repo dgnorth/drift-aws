@@ -1,0 +1,54 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "The root template that defines the tier itself.",
+    "Outputs": {
+        "Name": {
+            "Description": "Tier name.",
+            "Export": {
+                "Name": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "StackGroup"
+                            },
+                            "-tier-name"
+                        ]
+                    ]
+                }
+            },
+            "Value": {
+                "Ref": "TierName"
+            }
+        }
+    },
+    "Parameters": {
+        "StackGroup": {
+            "Description": "Name of the stack group this stack belongs to. It's typically the tier name.",
+            "Type": "String"
+        },
+        "TierName": {
+            "Description": "Name of the tier this stack group belongs to.",
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "LogGroup": {
+            "Properties": {
+                "LogGroupName": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            {
+                                "Ref": "StackGroup"
+                            },
+                            "-",
+                            "main-log-group"
+                        ]
+                    ]
+                }
+            },
+            "Type": "AWS::Logs::LogGroup"
+        }
+    }
+}

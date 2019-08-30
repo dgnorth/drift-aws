@@ -1,0 +1,8 @@
+
+#!/bin/bash
+
+# set cwd to where this script is
+cd "$(dirname "$0")"
+
+python cfn.py -c vpc.json -t -p VPCBaseNet=10.85 --region=cn-north-1 LIVECHINA
+
