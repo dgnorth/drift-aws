@@ -32,7 +32,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get -y update
 
 
 echo "Step 1 — Installing StrongSwan"
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q iptables-persistent strongswan strongswan-starter strongswan-pki strongswan-swanctl moreutils iptables-persistent
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q iptables-persistent strongswan strongswan-starter strongswan-pki strongswan-swanctl libcharon-extra-plugins moreutils iptables-persistent
 
 echo "Step 2 — Fetch Certificate Authority"
 mkdir vpn-certs
