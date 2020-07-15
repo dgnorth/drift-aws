@@ -25,10 +25,10 @@ def upload_template_to_s3(conn, region, bucket_name, key_name, template):
 
 def create_stack(conn, stackname, template=None, url=None, params=None, update=False):    
     if not update:
-        print "Creating stack '{}'".format(stackname)
+        print ("Creating stack '{}'".format(stackname))
         apply_to_stack = conn.create_stack
     else:
-        print "Updating stack '{}'".format(stackname)
+        print ("Updating stack '{}'".format(stackname))
         apply_to_stack = conn.update_stack  
 
     try:        
@@ -44,7 +44,7 @@ def create_stack(conn, stackname, template=None, url=None, params=None, update=F
             print("Stack '{}' already exists.".format(stackname))
             return create_stack(conn, stackname, template, url, params, update=True)
 
-        print "Error: {} - {}".format(body['Error']['Code'], body['Error']['Message'])
+        print ("Error: {} - {}".format(body['Error']['Code'], body['Error']['Message']))
         print("Exiting...")
         sys.exit(1)
     print("Stack creation/update in progress:  %s - %s" % (stackname, stack_id))
@@ -140,8 +140,6 @@ if __name__ == "__main__":
     else:
         values.params = []
 
-    values.params.append(["StackNameLower", values.stack.lower()])
-
     if values.debug:
         import logging
         logging.basicConfig(filename="boto.log", level=logging.DEBUG)
@@ -171,4 +169,4 @@ if __name__ == "__main__":
 
     if values.tail:
         tail(conn, values.stack)
-        print "Cloudformation execution finished."
+        print("Cloudformation execution finished.")
